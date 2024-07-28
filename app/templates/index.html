@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stock Analysis Platform</title>
+</head>
+<body>
+    <h1>Stock Analysis Platform</h1>
+    
+    <h2>Analyze Stock</h2>
+    <form method="post" action="{{ url_for('main.index') }}">
+        {{ analyze_stock_form.hidden_tag() }}
+        {{ analyze_stock_form.ticker.label }} {{ analyze_stock_form.ticker(size=20) }}<br>
+        {{ analyze_stock_form.date.label }} {{ analyze_stock_form.date() }}<br>
+        {{ analyze_stock_form.submit() }}
+    </form>
+    
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            <ul>
+            {% for category, message in messages %}
+                <li class="{{ category }}">{{ message }}</li>
+            {% endfor %}
+            </ul>
+        {% endif %}
+    {% endwith %}
+</body>
+</html>

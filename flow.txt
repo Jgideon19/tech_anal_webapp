@@ -1,0 +1,19 @@
+my_stock_analysis_platform/
+│
+├── app/
+│   ├── static/
+│   ├── templates/
+│   ├── __init__.py
+│   ├── models.py
+│   ├── views.py
+│   ├── forms.py
+│   ├── database.py
+│   └── utils.py
+│
+├── venv/
+│
+├── main.py
+│
+├── requirements.txt
+│
+└── config.py
