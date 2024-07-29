@@ -16,4 +16,10 @@ my_stock_analysis_platform/
 │
 ├── requirements.txt
 │
+├── Procfile
+│
+├── .gitignore
+│
+├── .elasticbeanstalk
+│
 └── config.py
