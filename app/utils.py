@@ -1,3 +1,4 @@
+import logging
 from matplotlib import pyplot as plt
 import mplfinance as mpf
 import pandas as pd
@@ -5,45 +6,55 @@ import yfinance as yf
 from datetime import timedelta
 from .models import StockData
 from .database import db
+import time
+
+# Set up logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 class TechnicalAnalysisPlatform:
     def __init__(self, db_session):
         self.db_session = db_session
 
-    def load_historical_data(self, tickers, start_date, end_date):
-        for ticker in tickers:
-            try:
-                stock = yf.Ticker(ticker)
-                data = stock.history(start=start_date, end=end_date)
-                if data.empty:
-                    print(f"No data available for {ticker}. Skipping.")
-                    continue
-                data.index = data.index.tz_localize(None)
-                data = self.calculate_indicators(data)
+    def load_historical_data(self, tickers, start_date, end_date, batch_size=10, delay=5):
+        for i in range(0, len(tickers), batch_size):
+            batch = tickers[i:i+batch_size]
+            for ticker in batch:
+                try:
+                    logger.info(f"Loading data for {ticker}")
+                    stock = yf.Ticker(ticker)
+                    data = stock.history(start=start_date, end=end_date)
+                    if data.empty:
+                        logger.warning(f"No data available for {ticker}. Skipping.")
+                        continue
+                    data.index = data.index.tz_localize(None)
+                    data = self.calculate_indicators(data)
 
-                for date, row in data.iterrows():
-                    stock_data = StockData(
-                        ticker=ticker,
-                        date=date.date(),
-                        open=row['Open'],
-                        high=row['High'],
-                        low=row['Low'],
-                        close=row['Close'],
-                        volume=row['Volume'],
-                        ma_200=row['200_MA'],
-                        ma_50=row['50_MA'],
-                        ma_20=row['20_MA'],
-                        ma_9=row['9_MA'],
-                        rsi=row['RSI'],
-                        vwap=row['VWAP']
-                    )
-                    self.db_session.add(stock_data)
+                    for date, row in data.iterrows():
+                        stock_data = StockData(
+                            ticker=ticker,
+                            date=date.date(),
+                            open=row['Open'],
+                            high=row['High'],
+                            low=row['Low'],
+                            close=row['Close'],
+                            volume=row['Volume'],
+                            ma_200=row['200_MA'],
+                            ma_50=row['50_MA'],
+                            ma_20=row['20_MA'],
+                            ma_9=row['9_MA'],
+                            rsi=row['RSI'],
+                            vwap=row['VWAP']
+                        )
+                        self.db_session.add(stock_data)
 
-                self.db_session.commit()
-                print(f"Data loaded successfully for {ticker} from {data.index.min().date()} to {data.index.max().date()}")
-            except Exception as e:
-                print(f"Error loading data for {ticker}: {str(e)}")
-                self.db_session.rollback()
+                    self.db_session.commit()
+                    logger.info(f"Data loaded successfully for {ticker} from {data.index.min().date()} to {data.index.max().date()}")
+                except Exception as e:
+                    logger.error(f"Error loading data for {ticker}: {str(e)}")
+                    self.db_session.rollback()
+            logger.info("Batch complete. Waiting before next batch.")
+            time.sleep(delay)
 
     def calculate_indicators(self, data):
         data['200_MA'] = data['Close'].rolling(window=200).mean()

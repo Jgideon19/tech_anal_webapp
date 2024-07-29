@@ -2,11 +2,16 @@ from flask import Flask
 from .database import db
 from .utils import TechnicalAnalysisPlatform
 from .models import StockData
+import logging
 
 def create_app():
     app = Flask(__name__)
     app.config.from_object('config.Config')
     db.init_app(app)
+
+    # Set up logging
+    logging.basicConfig(level=logging.INFO)
+    logger = logging.getLogger(__name__)
 
     with app.app_context():
         from .views import main_bp
@@ -76,9 +81,12 @@ def create_app():
                'AZN', 'DOYU', 'LRCX', 'JNJ', 'GOOGL']  # Add more tickers as needed
         start_date = '1900-01-01'
         end_date = '2024-07-22'
+
+        logger.info("Starting to load historical data for tickers.")
         try:
             platform.load_historical_data(tickers, start_date, end_date)
+            logger.info("Initial historical data load completed.")
         except Exception as e:
-            print(f"Error loading historical data: {str(e)}")
+            logger.error(f"Error loading historical data: {str(e)}")
 
     return app
