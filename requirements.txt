@@ -11,6 +11,7 @@ Flask-WTF==1.2.1
 fonttools==4.53.1
 frozendict==2.4.4
 greenlet==3.0.3
+gunicorn
 html5lib==1.1
 idna==3.7
 itsdangerous==2.2.0

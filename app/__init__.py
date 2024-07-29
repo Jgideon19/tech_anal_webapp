@@ -76,13 +76,9 @@ def create_app():
                'AZN', 'DOYU', 'LRCX', 'JNJ', 'GOOGL']  # Add more tickers as needed
         start_date = '1900-01-01'
         end_date = '2024-07-22'
-        platform.load_historical_data(tickers, start_date, end_date)
-
-        for ticker in tickers:
-            if not db.session.query(StockData).filter_by(ticker=ticker).first():
-                print(f"Loading data for {ticker}")
-                platform.load_historical_data([ticker], start_date, end_date)
-            else:
-                print(f"Data for {ticker} already exists")
+        try:
+            platform.load_historical_data(tickers, start_date, end_date)
+        except Exception as e:
+            print(f"Error loading historical data: {str(e)}")
 
     return app
