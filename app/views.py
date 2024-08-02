@@ -3,9 +3,10 @@ from .database import db
 from .models import StockData
 from .utils import TechnicalAnalysisPlatform
 from .forms import AnalyzeStockForm
+import logging
 
-# Define the blueprint
 main_bp = Blueprint('main', __name__)
+logger = logging.getLogger(__name__)
 
 @main_bp.route('/', methods=['GET', 'POST'])
 def index():
@@ -18,10 +19,12 @@ def index():
         platform = TechnicalAnalysisPlatform(db.session)
         try:
             results = platform.analyze_stock(ticker, date)
+            return render_template('analysis.html', results=results)
+        except ValueError as e:
+            flash(str(e), "warning")
+            logger.warning(f"ValueError in stock analysis: {str(e)}")
         except Exception as e:
-            flash(f"Error analyzing stock: {str(e)}", "danger")
-            results = []
-
-        return render_template('analysis.html', results=results)
+            flash("An unexpected error occurred. Please try again later.", "danger")
+            logger.error(f"Unexpected error in stock analysis: {str(e)}")
 
     return render_template('index.html', analyze_stock_form=analyze_stock_form)

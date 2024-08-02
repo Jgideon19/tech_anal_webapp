@@ -8,10 +8,6 @@ from .models import StockData
 from .database import db
 import time
 
-# Set up logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-
 class TechnicalAnalysisPlatform:
     def __init__(self, db_session):
         self.db_session = db_session
@@ -21,15 +17,16 @@ class TechnicalAnalysisPlatform:
             batch = tickers[i:i+batch_size]
             for ticker in batch:
                 try:
-                    logger.info(f"Loading data for {ticker}")
+                    logging.info(f"Loading data for {ticker}")
                     stock = yf.Ticker(ticker)
                     data = stock.history(start=start_date, end=end_date)
                     if data.empty:
-                        logger.warning(f"No data available for {ticker}. Skipping.")
+                        logging.warning(f"No data available for {ticker}. Skipping.")
                         continue
                     data.index = data.index.tz_localize(None)
                     data = self.calculate_indicators(data)
 
+                    stock_data_list = []
                     for date, row in data.iterrows():
                         stock_data = StockData(
                             ticker=ticker,
@@ -46,14 +43,15 @@ class TechnicalAnalysisPlatform:
                             rsi=row['RSI'],
                             vwap=row['VWAP']
                         )
-                        self.db_session.add(stock_data)
+                        stock_data_list.append(stock_data)
 
+                    self.db_session.bulk_save_objects(stock_data_list)
                     self.db_session.commit()
-                    logger.info(f"Data loaded successfully for {ticker} from {data.index.min().date()} to {data.index.max().date()}")
+                    logging.info(f"Data loaded successfully for {ticker}")
                 except Exception as e:
-                    logger.error(f"Error loading data for {ticker}: {str(e)}")
+                    logging.error(f"Error loading data for {ticker}: {str(e)}")
                     self.db_session.rollback()
-            logger.info("Batch complete. Waiting before next batch.")
+            logging.info("Batch complete. Waiting before next batch.")
             time.sleep(delay)
 
     def calculate_indicators(self, data):
