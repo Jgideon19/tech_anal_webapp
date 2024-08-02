@@ -20,7 +20,7 @@ def create_app():
 
         # Automatically load tickers
         platform = TechnicalAnalysisPlatform(db.session)
-        tickers = tickers = ['WMT', 'HPQ', 'BMRN', 'DAL', 'KEYS', 'NOW',
+        tickers = ['WMT', 'HPQ', 'BMRN', 'DAL', 'KEYS', 'NOW',
                'SJI', 'ECL', 'TRV', 'LOGC', 'LLY', 'ISRG',
                'PNC', 'LSI', 'ONCS', 'TXN', 'PRGO', 'BIDU',
                'GS', 'CMS', 'SPLK', 'SGEN', 'CWT', 'SO',
