@@ -4,24 +4,33 @@ import mplfinance as mpf
 import pandas as pd
 import yfinance as yf
 from datetime import timedelta
-from .models import StockData
-from .database import db
+from sqlalchemy import and_, or_
+from flask_caching import Cache
 import time
+
+# Set up logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# Setup caching
+cache = Cache(config={'CACHE_TYPE': 'simple'})
 
 class TechnicalAnalysisPlatform:
     def __init__(self, db_session):
         self.db_session = db_session
 
     def load_historical_data(self, tickers, start_date, end_date, batch_size=10, delay=5):
+        from .models import StockData  # Import here to avoid circular import
+
         for i in range(0, len(tickers), batch_size):
             batch = tickers[i:i+batch_size]
             for ticker in batch:
                 try:
-                    logging.info(f"Loading data for {ticker}")
+                    logger.info(f"Loading data for {ticker}")
                     stock = yf.Ticker(ticker)
                     data = stock.history(start=start_date, end=end_date)
                     if data.empty:
-                        logging.warning(f"No data available for {ticker}. Skipping.")
+                        logger.warning(f"No data available for {ticker}. Skipping.")
                         continue
                     data.index = data.index.tz_localize(None)
                     data = self.calculate_indicators(data)
@@ -47,11 +56,11 @@ class TechnicalAnalysisPlatform:
 
                     self.db_session.bulk_save_objects(stock_data_list)
                     self.db_session.commit()
-                    logging.info(f"Data loaded successfully for {ticker}")
+                    logger.info(f"Data loaded successfully for {ticker}")
                 except Exception as e:
-                    logging.error(f"Error loading data for {ticker}: {str(e)}")
+                    logger.error(f"Error loading data for {ticker}: {str(e)}")
                     self.db_session.rollback()
-            logging.info("Batch complete. Waiting before next batch.")
+            logger.info("Batch complete. Waiting before next batch.")
             time.sleep(delay)
 
     def calculate_indicators(self, data):
@@ -75,14 +84,17 @@ class TechnicalAnalysisPlatform:
         tp = (data['Low'] + data['Close'] + data['High']).div(3).values
         return pd.Series(data=tp.cumsum() / v.cumsum(), index=data.index)
 
+    @cache.memoize(timeout=3600)
     def analyze_stock(self, ticker, date):
         try:
             return self.find_similar_situations(ticker, date)
         except ValueError as e:
-            print(f"Error: {str(e)}")
+            logger.error(f"Error in analyze_stock: {str(e)}")
             return []
 
     def find_similar_situations(self, ticker, current_date, exclusion_period=365):
+        from .models import StockData  # Import here to avoid circular import
+
         current_date = pd.Timestamp(current_date).date()
         current_data = self.db_session.query(StockData).filter(
             StockData.ticker == ticker,
@@ -95,14 +107,18 @@ class TechnicalAnalysisPlatform:
         similar_situations = []
         exclusion_start = current_date - timedelta(days=exclusion_period)
 
+        # Optimize query to fetch all necessary data at once
         all_data = self.db_session.query(StockData).filter(
-            StockData.date < current_date
+            and_(
+                StockData.date < exclusion_start,
+                or_(
+                    StockData.ticker != ticker,
+                    StockData.date < exclusion_start
+                )
+            )
         ).all()
 
         for row in all_data:
-            if row.ticker == ticker and exclusion_start <= row.date <= current_date:
-                continue
-
             similarity_score = self.calculate_similarity(current_data, row)
             if similarity_score > 0.9:  # Arbitrary threshold, adjust as needed
                 similar_situations.append({
@@ -125,6 +141,8 @@ class TechnicalAnalysisPlatform:
         return sum(differences) / len(differences) if differences else 0
 
     def get_available_date_range(self, ticker):
+        from .models import StockData  # Import here to avoid circular import
+
         min_date = self.db_session.query(StockData.date).filter(StockData.ticker == ticker).order_by(StockData.date.asc()).first()
         max_date = self.db_session.query(StockData.date).filter(StockData.ticker == ticker).order_by(StockData.date.desc()).first()
 
@@ -134,6 +152,8 @@ class TechnicalAnalysisPlatform:
         return min_date[0], max_date[0]
 
     def plot_comparison(self, ticker, date, similar_situation, window=30):
+        from .models import StockData  # Import here to avoid circular import
+
         current_date = pd.Timestamp(date).date()
         similar_date = pd.Timestamp(similar_situation['date']).date()
 
@@ -160,4 +180,4 @@ class TechnicalAnalysisPlatform:
         ax2.legend()
 
         plt.tight_layout()
-        plt.show()
+        return fig
