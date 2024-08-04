@@ -4,6 +4,8 @@ from flask_migrate import Migrate
 import logging
 from flask_apscheduler import APScheduler
 from app.utils import TechnicalAnalysisPlatform
+import datetime
+from datetime import timedelta
 
 scheduler = APScheduler()
 
@@ -97,7 +99,7 @@ def create_app():
               'INTU', 'GMRE', 'WMB', 'MTCH', 'BLKB', 'SYRS', 'MPW', 'QFIN', 'GH', 'EXC', 'OZON', 'AWR', 'CSX', 'GSK',
               'AZN', 'DOYU', 'LRCX', 'JNJ', 'GOOGL']  # Your list of tickers
             end_date = datetime.now().strftime('%Y-%m-%d')
-            start_date = '1900-01-01'  # Get last 120 years of data
+            start_date = (datetime.now() - timedelta(days=5)).strftime('%Y-%m-%d')  # Get last 5 days of data
             platform.load_historical_data(tickers, start_date, end_date)
 
     return app
