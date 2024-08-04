@@ -10,5 +10,4 @@ class LoadDataForm(FlaskForm):
 
 class AnalyzeStockForm(FlaskForm):
     ticker = StringField('Ticker', validators=[DataRequired()])
-    date = DateField('Date', format='%Y-%m-%d', validators=[DataRequired()])
     submit = SubmitField('Analyze')

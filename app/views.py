@@ -26,7 +26,19 @@ def analyze():
     form = AnalyzeStockForm(request.form)
     if form.validate():
         ticker = form.ticker.data
-        date = form.date.data
+        
+        # Get the most recent market date
+        most_recent_date = db.session.query(StockData.date)\
+            .filter(StockData.ticker == ticker)\
+            .order_by(StockData.date.desc())\
+            .first()
+        
+        if most_recent_date:
+            date = most_recent_date[0]
+        else:
+            flash(f"No data available for {ticker}")
+            return redirect(url_for('main.index'))
+        
         task = analyze_stock_task.delay(ticker, date)
         return jsonify({"task_id": task.id}), 202
     return jsonify({"error": "Invalid form data"}), 400

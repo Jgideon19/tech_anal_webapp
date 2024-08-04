@@ -7,6 +7,7 @@ from datetime import timedelta
 from sqlalchemy import and_, or_
 from flask_caching import Cache
 import time
+from .models import StockData 
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -20,7 +21,6 @@ class TechnicalAnalysisPlatform:
         self.db_session = db_session
 
     def load_historical_data(self, tickers, start_date, end_date, batch_size=10, delay=5):
-        from .models import StockData  # Import here to avoid circular import
 
         for i in range(0, len(tickers), batch_size):
             batch = tickers[i:i+batch_size]
@@ -35,26 +35,40 @@ class TechnicalAnalysisPlatform:
                     data.index = data.index.tz_localize(None)
                     data = self.calculate_indicators(data)
 
-                    stock_data_list = []
                     for date, row in data.iterrows():
-                        stock_data = StockData(
-                            ticker=ticker,
-                            date=date.date(),
-                            open=row['Open'],
-                            high=row['High'],
-                            low=row['Low'],
-                            close=row['Close'],
-                            volume=row['Volume'],
-                            ma_200=row['200_MA'],
-                            ma_50=row['50_MA'],
-                            ma_20=row['20_MA'],
-                            ma_9=row['9_MA'],
-                            rsi=row['RSI'],
-                            vwap=row['VWAP']
-                        )
-                        stock_data_list.append(stock_data)
+                        stock_data = StockData.query.filter_by(ticker=ticker, date=date.date()).first()
+                        if stock_data:
+                        # Update existing record
+                            stock_data.open = row['Open']
+                            stock_data.high = row['High']
+                            stock_data.low = row['Low']
+                            stock_data.close = row['Close']
+                            stock_data.volume = row['Volume']
+                            stock_data.ma_200 = row['200_MA']
+                            stock_data.ma_50 = row['50_MA']
+                            stock_data.ma_20 = row['20_MA']
+                            stock_data.ma_9 = row['9_MA']
+                            stock_data.rsi = row['RSI']
+                            stock_data.vwap = row['VWAP']
+                        else:
+                        # Create new record
+                            stock_data = StockData(
+                                ticker=ticker,
+                                date=date.date(),
+                                open=row['Open'],
+                                high=row['High'],
+                                low=row['Low'],
+                                close=row['Close'],
+                                volume=row['Volume'],
+                                ma_200=row['200_MA'],
+                                ma_50=row['50_MA'],
+                                ma_20=row['20_MA'],
+                                ma_9=row['9_MA'],
+                                rsi=row['RSI'],
+                                vwap=row['VWAP']
+                            )
+                            self.db_session.add(stock_data)
 
-                    self.db_session.bulk_save_objects(stock_data_list)
                     self.db_session.commit()
                     logger.info(f"Data loaded successfully for {ticker}")
                 except Exception as e:
