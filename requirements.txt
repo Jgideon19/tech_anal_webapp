@@ -42,3 +42,4 @@ webencodings==0.5.1
 Werkzeug==3.0.3
 WTForms==3.1.2
 yfinance==0.2.41
+Flask-Migrate==4.0.4

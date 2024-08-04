@@ -4,8 +4,7 @@ from flask_migrate import Migrate
 import logging
 from flask_apscheduler import APScheduler
 from app.utils import TechnicalAnalysisPlatform
-import datetime
-from datetime import timedelta
+from . import commands
 
 scheduler = APScheduler()
 
@@ -36,16 +35,6 @@ def create_app():
 
         logger.info("Application instance created and configured")
 
-        @scheduler.task('cron', id='update_stock_data', hour=1)  # Run daily at 1 AM
-        def update_stock_data():
-            platform = TechnicalAnalysisPlatform(db.session)
-            tickers = ['AAPL', 'MSFT', 'GOOGL', 'GOOG', 'NVDA', 'META', 'AVGO', 'ORCL', 'ADBE', 'CSCO',
-           'CRM', 'ACN', 'QCOM', 'INTC', 'AMD', 'TXN', 'IBM', 'MU', 'INTU', 'AMAT',
-           'ADI', 'LRCX', 'NOW', 'SNPS', 'CDNS', 'AMZN', 'NFLX', 'PYPL', 'SHOP', 'SQ',
-           'ZM', 'TWLO', 'SPOT', 'DOCU', 'ROKU', 'UBER', 'LYFT', 'BABA', 'JD', 'PDD']
-  # Your list of tickers
-            end_date = datetime.now().strftime('%Y-%m-%d')
-            start_date = (datetime.now() - timedelta(days=5)).strftime('%Y-%m-%d')  # Get last 5 days of data
-            platform.load_historical_data(tickers, start_date, end_date)
+    commands.init_app(app)
 
     return app
