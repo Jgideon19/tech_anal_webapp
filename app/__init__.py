@@ -4,7 +4,7 @@ from flask_migrate import Migrate
 import logging
 from flask_apscheduler import APScheduler
 from app.utils import TechnicalAnalysisPlatform
-from . import commands
+import os
 
 scheduler = APScheduler()
 
@@ -24,6 +24,8 @@ def create_app():
     scheduler.start()
 
     with app.app_context():
+        if not os.path.exists('/var/app/current/stock_data.db'):
+            db.create_all()
         # Import parts of our application
         from .views import main_bp
         
@@ -34,7 +36,5 @@ def create_app():
         db.create_all()
 
         logger.info("Application instance created and configured")
-
-    commands.init_app(app)
 
     return app

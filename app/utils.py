@@ -8,6 +8,9 @@ from sqlalchemy import and_, or_
 from flask_caching import Cache
 import time
 from .models import StockData 
+import datetime
+from datetime import timedelta
+import threading
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -16,66 +19,81 @@ logger = logging.getLogger(__name__)
 # Setup caching
 cache = Cache(config={'CACHE_TYPE': 'simple'})
 
+
+class SQLiteLock:
+    _lock = threading.Lock()
+
+    @classmethod
+    def acquire(cls):
+        cls._lock.acquire()
+
+    @classmethod
+    def release(cls):
+        cls._lock.release()
+
 class TechnicalAnalysisPlatform:
     def __init__(self, db_session):
         self.db_session = db_session
 
     def load_historical_data(self, tickers, start_date, end_date, batch_size=10, delay=5):
+        SQLiteLock.acquire()
+        try:
+            for i in range(0, len(tickers), batch_size):
+                batch = tickers[i:i+batch_size]
+                for ticker in batch:
+                    try:
+                        logger.info(f"Loading data for {ticker}")
+                        stock = yf.Ticker(ticker)
+                        data = stock.history(start=start_date, end=end_date)
+                        if data.empty:
+                            logger.warning(f"No data available for {ticker}. Skipping.")
+                            continue
+                        data.index = data.index.tz_localize(None)
+                        data = self.calculate_indicators(data)
 
-        for i in range(0, len(tickers), batch_size):
-            batch = tickers[i:i+batch_size]
-            for ticker in batch:
-                try:
-                    logger.info(f"Loading data for {ticker}")
-                    stock = yf.Ticker(ticker)
-                    data = stock.history(start=start_date, end=end_date)
-                    if data.empty:
-                        logger.warning(f"No data available for {ticker}. Skipping.")
-                        continue
-                    data.index = data.index.tz_localize(None)
-                    data = self.calculate_indicators(data)
+                        for date, row in data.iterrows():
+                            stock_data = StockData.query.filter_by(ticker=ticker, date=date.date()).first()
+                            if stock_data:
+                            # Update existing record
+                                stock_data.open = row['Open']
+                                stock_data.high = row['High']
+                                stock_data.low = row['Low']
+                                stock_data.close = row['Close']
+                                stock_data.volume = row['Volume']
+                                stock_data.ma_200 = row['200_MA']
+                                stock_data.ma_50 = row['50_MA']
+                                stock_data.ma_20 = row['20_MA']
+                                stock_data.ma_9 = row['9_MA']
+                                stock_data.rsi = row['RSI']
+                                stock_data.vwap = row['VWAP']
+                            else:
+                            # Create new record
+                                stock_data = StockData(
+                                    ticker=ticker,
+                                    date=date.date(),
+                                    open=row['Open'],
+                                    high=row['High'],
+                                    low=row['Low'],
+                                    close=row['Close'],
+                                    volume=row['Volume'],
+                                    ma_200=row['200_MA'],
+                                    ma_50=row['50_MA'],
+                                    ma_20=row['20_MA'],
+                                    ma_9=row['9_MA'],
+                                    rsi=row['RSI'],
+                                    vwap=row['VWAP']
+                                )
+                                self.db_session.add(stock_data)
 
-                    for date, row in data.iterrows():
-                        stock_data = StockData.query.filter_by(ticker=ticker, date=date.date()).first()
-                        if stock_data:
-                        # Update existing record
-                            stock_data.open = row['Open']
-                            stock_data.high = row['High']
-                            stock_data.low = row['Low']
-                            stock_data.close = row['Close']
-                            stock_data.volume = row['Volume']
-                            stock_data.ma_200 = row['200_MA']
-                            stock_data.ma_50 = row['50_MA']
-                            stock_data.ma_20 = row['20_MA']
-                            stock_data.ma_9 = row['9_MA']
-                            stock_data.rsi = row['RSI']
-                            stock_data.vwap = row['VWAP']
-                        else:
-                        # Create new record
-                            stock_data = StockData(
-                                ticker=ticker,
-                                date=date.date(),
-                                open=row['Open'],
-                                high=row['High'],
-                                low=row['Low'],
-                                close=row['Close'],
-                                volume=row['Volume'],
-                                ma_200=row['200_MA'],
-                                ma_50=row['50_MA'],
-                                ma_20=row['20_MA'],
-                                ma_9=row['9_MA'],
-                                rsi=row['RSI'],
-                                vwap=row['VWAP']
-                            )
-                            self.db_session.add(stock_data)
-
-                    self.db_session.commit()
-                    logger.info(f"Data loaded successfully for {ticker}")
-                except Exception as e:
-                    logger.error(f"Error loading data for {ticker}: {str(e)}")
-                    self.db_session.rollback()
-            logger.info("Batch complete. Waiting before next batch.")
-            time.sleep(delay)
+                        self.db_session.commit()
+                        logger.info(f"Data loaded successfully for {ticker}")
+                    except Exception as e:
+                        logger.error(f"Error loading data for {ticker}: {str(e)}")
+                        self.db_session.rollback()
+                logger.info("Batch complete. Waiting before next batch.")
+                time.sleep(delay)
+        finally:
+            SQLiteLock.release()
 
     def calculate_indicators(self, data):
         data['200_MA'] = data['Close'].rolling(window=200).mean()
@@ -195,3 +213,12 @@ class TechnicalAnalysisPlatform:
 
         plt.tight_layout()
         return fig
+    
+    def update_stock_data(self, tickers):
+        SQLiteLock.acquire()
+        try:
+            end_date = datetime.now().strftime('%Y-%m-%d')
+            start_date = (datetime.now() - timedelta(days=7)).strftime('%Y-%m-%d')  # Update last week's data
+            self.load_historical_data(tickers, start_date, end_date)
+        finally:
+            SQLiteLock.release()

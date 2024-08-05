@@ -6,6 +6,9 @@ from .forms import AnalyzeStockForm
 from flask_caching import Cache
 from celery import Celery
 import logging
+import datetime
+from datetime import timedelta
+import yfinance
 
 main_bp = Blueprint('main', __name__)
 logger = logging.getLogger(__name__)
@@ -15,6 +18,28 @@ cache = Cache(config={'CACHE_TYPE': 'simple'})
 
 # Setup Celery
 celery = Celery(__name__, broker='redis://localhost:6379/0')
+
+@main_bp.route('/load-data', methods=['POST'])
+def load_data():
+    platform = TechnicalAnalysisPlatform(db.session)
+    tickers = ['AAPL', 'MSFT', 'GOOGL', 'GOOG', 'NVDA', 'META', 'AVGO', 'ORCL', 'ADBE', 'CSCO',
+        'CRM', 'ACN', 'QCOM', 'INTC', 'AMD', 'TXN', 'IBM', 'MU', 'INTU', 'AMAT',
+        'ADI', 'LRCX', 'NOW', 'SNPS', 'CDNS', 'AMZN', 'NFLX', 'PYPL', 'SHOP', 'SQ',
+        'ZM', 'TWLO', 'SPOT', 'DOCU', 'ROKU', 'UBER', 'LYFT', 'BABA', 'JD', 'PDD'] # Your list of tickers
+    end_date = datetime.now().strftime('%Y-%m-%d')
+    start_date = '1900-01-01'
+    platform.load_historical_data(tickers, start_date, end_date)
+
+@main_bp.route('/update-data', methods=['POST'])
+def update_data():
+    platform = TechnicalAnalysisPlatform(db.session)
+    tickers = ['AAPL', 'MSFT', 'GOOGL', 'GOOG', 'NVDA', 'META', 'AVGO', 'ORCL', 'ADBE', 'CSCO',
+        'CRM', 'ACN', 'QCOM', 'INTC', 'AMD', 'TXN', 'IBM', 'MU', 'INTU', 'AMAT',
+        'ADI', 'LRCX', 'NOW', 'SNPS', 'CDNS', 'AMZN', 'NFLX', 'PYPL', 'SHOP', 'SQ',
+        'ZM', 'TWLO', 'SPOT', 'DOCU', 'ROKU', 'UBER', 'LYFT', 'BABA', 'JD', 'PDD'] # Your list of tickers
+    end_date = datetime.now().strftime('%Y-%m-%d')
+    start_date = (datetime.now() - timedelta(days=7)).strftime('%Y-%m-%d')  # Update last week's data
+    platform.load_historical_data(tickers, start_date, end_date)
 
 @main_bp.route('/', methods=['GET', 'POST'])
 def index():
